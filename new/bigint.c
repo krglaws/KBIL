@@ -67,7 +67,7 @@ enum BI_error BI_add(bigint* a, bigint* b, bigint* c)
   while (i < b->len || j < c->len || carry)
   {
     if (k == temp->len)
-      temp->val = realloc(temp->val, ++temp->len);
+      temp->val = realloc(temp->val, temp->len);
 
     int sum = (carry +
               (i < b->len ? b->val[i++] * b->sign : 0) +
@@ -133,7 +133,7 @@ enum BI_error BI_mul(bigint* a, bigint* b, bigint* c)
       BI_add(temp, temp, c);
 
     unsigned char* fullval = calloc(1, temp->len + i);
-    memcpy(fullval, temp->val+i, temp->len);
+    memcpy(fullval+i, temp->val, temp->len);
     free(temp->val);
     temp->val = fullval;
     temp->len += i;
@@ -193,24 +193,6 @@ enum BI_error BI_div(bigint* a, bigint* n, bigint* d)
 
   return BIERR_ZERO;
 }
-
-
-/*
-void BI_shl(bigint* a, int bits)
-{
-  int bitlen = (a->len * 8) + bits;
-  bitlen += 8 - (bitlen % 8);
-
-  int pow = ((bitlen / 8) / 16) + 1;
-  int bytelen = 1;
-
-  for (int i = 0; i < pow; i++)
-  {
-    bytlen *= 16;
-
-  bigint* b = calloc(1, sizeof(bigint));
-}
-*/
 
 
 enum BI_comparison BI_cmp(bigint* a, bigint* b)
@@ -285,5 +267,30 @@ void BI_print(bigint* bi)
   }
   if (bi->len == 0) printf("0");
   printf("]\n");
+}
+
+
+void BI_perror(char* context)
+{
+  switch(BI_errno)
+  {
+    case BIERR_ZERO:
+      fprintf(stderr, "%s: Success\n", context);
+      break;
+    case BIERR_NULLARG:
+      fprintf(stderr, "%s: Null argument\n", context);
+      break;
+    case BIERR_INVBASE:
+      fprintf(stderr, "%s: Invalid base\n", context);
+      break;
+    case BIERR_NOTIMPL:
+      fprintf(stderr, "%s: Feature not yet implemented\n", context);
+      break;
+    case BIERR_DIVZERO:
+      fprintf(stderr, "%s: Divide by zero\n", context);
+      break;
+    default:
+      fprintf(stderr, "%s: Unknown error %d\n", context, BI_errno);
+  }
 }
 
