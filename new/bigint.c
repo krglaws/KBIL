@@ -12,7 +12,7 @@
 static enum BI_error BI_errno = 0;
 
 
-bigint* BI_new(int32_t val)
+bigint* BI_new(int32_t num)
 {
   bigint* bi;
   uint64_t abs;
@@ -20,9 +20,9 @@ bigint* BI_new(int32_t val)
   bi = calloc(1, sizeof(bigint));
   bi->len = 0;
   bi->val = calloc(1, 1);
-  bi->sign = val < 0 ? -1 : 1;
+  bi->sign = num < 0 ? -1 : 1;
 
-  abs = ABS(val);
+  abs = ABS(num);
 
   while (abs)
   {
@@ -31,7 +31,7 @@ bigint* BI_new(int32_t val)
     abs /= 256;
   } 
 
-  if (val == 0)
+  if (num == 0)
     bi->len = 1;
 
   return bi;
@@ -46,94 +46,119 @@ void BI_free(bigint* bi)
 }
 
 
-enum BI_error BI_add(bigint* a, bigint* b, bigint* c)
+enum BI_error BI_set_i(bigint* bi, int32_t num)
 {
-  if (a == NULL || b == NULL || c == NULL)
+  if (bi == NULL)
+    return BI_errno = BIERR_NULLARG;
+
+  bigint* temp = BI_new(num);
+  BI_set_bi(bi, temp);
+  BI_free(temp);
+
+  return BI_errno = BIERR_ZERO;
+}
+
+
+enum BI_error BI_set_bi(bigint* bi, bigint* num)
+{
+  if (bi == NULL || num == NULL)
+    return BI_errno = BIERR_NULLARG;
+
+  bi->sign = num->sign;
+  bi->len = num->len;
+  bi->val = realloc(bi->val, num->len);
+  memcpy(bi->val, num->val, num->len);
+
+  return BI_errno = BIERR_ZERO;
+}
+
+
+enum BI_error BI_add(bigint* res, bigint* a, bigint* b)
+{
+  if (res == NULL || a == NULL || b == NULL)
     return BI_errno = BIERR_NULLARG;
 
   int sign = 1;
 
-  if (b->sign == -1 && c->sign == -1)
+  if (a->sign == -1 && b->sign == -1)
     sign = -1;
-  else if (b->sign == -1 && BI_cmp_mag(b, c) == BI_GREATERTHAN)
+  else if (a->sign == -1 && BI_cmp_mag(a, b) == BI_GREATERTHAN)
     sign = -1;
-  else if (c->sign == -1 && BI_cmp_mag(c, b) == BI_GREATERTHAN)
+  else if (b->sign == -1 && BI_cmp_mag(b, a) == BI_GREATERTHAN)
     sign = -1;
 
-  bigint* temp = BI_new((int32_t) 0);
+  bigint* temp = BI_new(0);
 
   int i = 0, j = 0, k = 0, carry = 0;
 
-  while (i < b->len || j < c->len || carry)
+  while (i < a->len || j < b->len || carry)
   {
     if (k == temp->len)
       temp->val = realloc(temp->val, temp->len);
 
     int sum = (carry +
-              (i < b->len ? b->val[i++] * b->sign : 0) +
-              (j < c->len ? c->val[j++] * c->sign : 0));
+              (i < a->len ? a->val[i++] * a->sign : 0) +
+              (j < b->len ? b->val[j++] * b->sign : 0));
 
-    if (b->sign == 1 && sum < 0)
+    if (a->sign == 1 && sum < 0)
       temp->val[k++] = 256 - (ABS(sum) % 256);
     else
       temp->val[k++] = ABS(sum) % 256;
 
     if (sum > 255) carry = 1;
     else if (sum < -255) carry = -1;
-    else if (b->sign == 1 && sum < 0) carry = -1;
+    else if (a->sign == 1 && sum < 0) carry = -1;
     else carry = 0;
 
     if (temp->val[k-1]) temp->len = k;
   }
 
-  a->sign = sign;
-  a->len = temp->len;
-  a->val = realloc(a->val, temp->len);
-  memcpy(a->val, temp->val, temp->len);
+  BI_set_bi(res, temp);
+  res->sign = sign;
   BI_free(temp);
 
   return BIERR_ZERO;
 }
 
 
-enum BI_error BI_sub(bigint* a, bigint* b, bigint* c)
+enum BI_error BI_sub(bigint* res, bigint* a, bigint* b)
 {
-  if (a == NULL || b == NULL || c == NULL)
+  if (res == NULL || a == NULL || b == NULL)
     return BI_errno = BIERR_NULLARG;
 
-  int csign = c->sign;
-  c->sign *= -1;
+  int bsign = b->sign;
+  b->sign *= -1;
 
-  enum BI_error status = BI_add(a, b, c);
+  enum BI_error status = BI_add(res, a, b);
 
-  if (c != a)
-    c->sign = csign;
+  if (b != res)
+    b->sign = bsign;
 
   return BIERR_ZERO;
 }
 
 
-enum BI_error BI_mul(bigint* a, bigint* b, bigint* c)
+enum BI_error BI_mul(bigint* res, bigint* a, bigint* b)
 {
-  if (a == NULL || b == NULL || c == NULL)
+  if (res == NULL || a == NULL || b == NULL)
     return BI_errno = BIERR_NULLARG;
 
-  int sign = b->sign * c->sign;
+  int sign = a->sign * b->sign;
 
-  int csign = c->sign;
-  c->sign = 1;
+  int bsign = b->sign;
+  b->sign = 1;
 
   bigint* product = BI_new(0);
 
-  for (int i = 0; i < b->len; i++)
+  for (int i = 0; i < a->len; i++)
   {
     bigint* temp = BI_new(0);
 
-    for (int j = 0; j < b->val[i]; j++)
-      BI_add(temp, temp, c);
+    for (int j = 0; j < a->val[i]; j++)
+      BI_add(temp, temp, b);
 
     unsigned char* fullval = calloc(1, temp->len + i);
-    memcpy(fullval+i, temp->val, temp->len);
+    memcpy(fullval + i, temp->val, temp->len);
     free(temp->val);
     temp->val = fullval;
     temp->len += i;
@@ -142,56 +167,100 @@ enum BI_error BI_mul(bigint* a, bigint* b, bigint* c)
     BI_free(temp);
   }
 
-  c->sign = csign;
+  b->sign = bsign;
 
-  a->sign = sign;
-  a->len = product->len;
-  a->val = realloc(a->val, product->len);
-  memcpy(a->val, product->val, product->len);
+  BI_set_bi(res, product);
+  res->sign = sign;
+
   BI_free(product);
 
   return BIERR_ZERO;
 }
 
 
-enum BI_error BI_div(bigint* a, bigint* n, bigint* d)
+enum BI_error BI_pow(bigint* res, bigint* b, bigint* e)
 {
-  if (a == NULL || n == NULL || d == NULL)
+  if (res == NULL || b == NULL || e == NULL)
+    return BI_errno = BIERR_NULLARG;
+
+  if (e->sign == -1)
+  {
+    BI_set_i(res, 0);
+    return BI_errno = BIERR_ZERO;
+  }
+
+  bigint* product = BI_new(1);
+}
+
+
+enum BI_error BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d)
+{
+  if (n == NULL || d == NULL)
     return BI_errno = BIERR_NULLARG;
 
   int sign = n->sign * d->sign;
-  int nsign = n->sign; n->sign = 1;
-  int dsign = d->sign; d->sign = 1;
+  int dsign = d->sign, nsign = n->sign;
+  n->sign = 1;
+  d->sign = 1;
 
-  bigint* result = BI_new(0);
-  if (BI_cmp(d, result) == BI_EQUAL)
+  bigint* quotient = BI_new(0);
+  if (BI_cmp(d, quotient) == BI_EQUAL)
     return BI_errno = BIERR_DIVZERO;
 
   bigint* temp = BI_new(0);
   BI_add(temp, temp, n);
-  bigint* one = BI_new(1);
 
-  enum BI_comparison cmp = BI_cmp(temp, d);
+  bigint* multiplier = BI_new(1);
+  bigint* two = BI_new(2);
+  bigint* subtractor = BI_new(0);
+  BI_add(subtractor, subtractor, d);
 
-  while (cmp == BI_GREATERTHAN || cmp == BI_EQUAL)
+  while (BI_cmp(temp, d) != BI_LESSTHAN)
   {
-    BI_add(result, result, one);
-    BI_sub(temp, temp, d);
-    cmp = BI_cmp(temp, d);
+    if (BI_cmp(subtractor, temp) == BI_GREATERTHAN)
+    {
+      BI_set_bi(subtractor, d);
+      BI_set_i(multiplier, 1);
+      continue;
+    }
+    BI_sub(temp, temp, subtractor);
+    BI_add(quotient, quotient, multiplier);
+
+    BI_mul(subtractor, two, subtractor);
+    BI_mul(multiplier, multiplier, two);
   }
 
-  BI_free(one);
+  if (res)
+  { 
+    BI_set_bi(res, quotient);
+    res->sign = sign;
+  }
+
+  if (rem)
+    BI_set_bi(rem, temp);
+
+  n->sign = nsign;
+  d->sign = dsign;  
+
+  BI_free(quotient);
   BI_free(temp);
-
-  a->sign = sign;
-  a->len = result->len;
-  memcpy(a->val, result->val, result->len);
-  BI_free(result);
-
-  if (n != a) n->sign = nsign;
-  if (d != a) d->sign = dsign;
+  BI_free(multiplier);
+  BI_free(two);
+  BI_free(subtractor);
 
   return BIERR_ZERO;
+}
+
+
+enum BI_error BI_div(bigint* res, bigint* n, bigint* d)
+{
+  return BI_div_mod(res, NULL, n, d);
+}
+
+
+enum BI_error BI_mod(bigint* res, bigint* n, bigint* m)
+{
+  return BI_div_mod(NULL, res, n, m);
 }
 
 

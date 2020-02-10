@@ -29,17 +29,27 @@ struct bigint
   int len;
 };
 
-bigint* BI_new(int32_t val);
+bigint* BI_new(int32_t num);
 
 void BI_free(bigint* bi);
 
-enum BI_error BI_add(bigint* a, bigint* b, bigint* c);
+enum BI_error BI_set_i(bigint* bi, int32_t num);
 
-enum BI_error BI_sub(bigint* a, bigint* b, bigint* c);
+enum BI_error BI_set_bi(bigint* bi, bigint* num);
 
-enum BI_error BI_mul(bigint* a, bigint* b, bigint* c);
+enum BI_error BI_add(bigint* res, bigint* a, bigint* b);
 
-enum BI_error BI_div(bigint* a, bigint* n, bigint* d);
+enum BI_error BI_sub(bigint* res, bigint* a, bigint* b);
+
+enum BI_error BI_mul(bigint* res, bigint* a, bigint* b);
+
+enum BI_error BI_pow(bigint* res, bigint* b, bigint* e);
+
+enum BI_error BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d);
+
+enum BI_error BI_div(bigint* res, bigint* n, bigint* d);
+
+enum BI_error BI_mod(bigint* res, bigint* n, bigint* m);
 
 enum BI_comparison BI_cmp(bigint* a, bigint* b);
 
