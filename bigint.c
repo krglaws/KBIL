@@ -8,6 +8,8 @@
 
 #define ABS(n) (n < 0 ? (~n) + 1 : n)
 
+#define MAX(a, b) (a > b ? a : b)
+
 
 static enum BI_error BI_errno = 0;
 
@@ -78,44 +80,134 @@ enum BI_error BI_add(bigint* res, bigint* a, bigint* b)
   if (res == NULL || a == NULL || b == NULL)
     return BI_errno = BIERR_NULLARG;
 
-  int sign = 1;
+  /* if the signs don't match up... */
+  if (a->sign != b->sign)
+  {
+    /* make sure 'a' is positive and vice versa */
+    if (b->sign == 1)
+    {
+      bigint* temp = a;
+      a = b;
+      b = temp;
+    }
+  }
 
+  /* result attributes */
+  int sign = 1, len = 1;
+
+  /* compare magnitudes of 'a' and 'b' */
+  enum BI_comparison mag = BI_cmp_mag(a, b);
+
+  /* figure out if result is signed */
   if (a->sign == -1 && b->sign == -1)
+  {
     sign = -1;
-  else if (a->sign == -1 && BI_cmp_mag(a, b) == BI_GREATERTHAN)
+  }
+  else if (a->sign == -1 && mag == BI_GREATERTHAN)
+  {
     sign = -1;
-  else if (b->sign == -1 && BI_cmp_mag(b, a) == BI_GREATERTHAN)
+  }
+  else if (b->sign == -1 && mag == BI_LESSTHAN)
+  {
     sign = -1;
+  }
 
-  bigint* temp = BI_new(0);
+  /* save signs */
+  int asign = a->sign;
+  int bsign = b->sign;
 
+  /* if signs are not equal,
+     the larger magnitude value must 
+     be positive, and vice versa */
+  if (asign != bsign)
+  {
+    if (mag == BI_LESSTHAN)
+    {
+      a->sign = -1;
+      b->sign = 1;
+    }
+    else
+    {
+      a->sign = 1;
+      b->sign = -1;
+    }
+  }
+
+  /* temporary result array */
+  int templen = 1 + MAX(a->len, b->len);
+  unsigned char tempval[templen];
+
+  /* loop until addition is complete */
   int i = 0, j = 0, k = 0, carry = 0;
 
   while (i < a->len || j < b->len || carry)
   {
-    if (k == temp->len)
-      temp->val = realloc(temp->val, ++temp->len);
+    int sum = 0, curra = 0, currb = 0;
 
-    int sum = (carry +
-              (i < a->len ? a->val[i++] * a->sign : 0) +
-              (j < b->len ? b->val[j++] * b->sign : 0));
+    curra = (i < a->len ? a->val[i++] * a->sign : 0);
+    currb = (j < b->len ? b->val[j++] * b->sign : 0);
 
-    if (a->sign == 1 && sum < 0)
-      temp->val[k++] = 256 - (ABS(sum) % 256);
+    /* add up 'carry', plus 'curra' and 'currb' values */
+    sum = carry + curra + currb;
+
+    /* if this is subtraction, and the magnitude of 'a'
+       is less than 'b'... */
+    if (a->sign != b->sign && sum < 0)
+    {
+      tempval[k] = 256 - (ABS(sum) % 256);
+      carry = -1;
+    }
     else
-      temp->val[k++] = ABS(sum) % 256;
+    {
+      tempval[k] = ABS(sum) % 256;
+      if (sum > 255)
+      {
+        carry = 1;
+      }
+      else if (sum < -255)
+      {
+        carry = -1;
+      }
+    }
 
-    if (sum > 255) carry = 1;
-    else if (sum < -255) carry = -1;
-    else if (a->sign == 1 && sum < 0) carry = -1;
-    else carry = 0;
+    k++;
 
-    if (temp->val[k-1]) temp->len = k;
+    /* figure out value of 'carry' */
+    /*if (sum > 255)
+    {
+      carry = 1;
+    }
+    else if (sum < -255)
+    {
+      carry = -1;
+    }
+    else if (a->sign == 1 && sum < 0)
+    {
+      carry = 1;
+    }
+    else
+    {
+      carry = 0;
+    }*/
+
+    if (tempval[k-1])
+    {
+      len = k;
+    }
   }
 
+  /* restore signs */
+  a->sign = asign;
+  b->sign = bsign;
+
+  /* transfer result into 'res' param */
+  bigint* temp = calloc(1, sizeof(bigint));
+  temp->len = len;
+  temp->sign = sign;
+  temp->val = calloc(1, len);
+  memcpy(temp->val, tempval, len);
   BI_set_bi(res, temp);
-  res->sign = sign;
-  BI_free(temp);
+  free(temp);
 
   return BIERR_ZERO;
 }
