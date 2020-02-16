@@ -190,13 +190,11 @@ int BI_add(bigint* res, bigint* a, bigint* b)
   b->sign = bsign;
 
   /* transfer result into 'res' param */
-  bigint* temp = calloc(1, sizeof(bigint));
-  temp->len = len;
-  temp->sign = sign;
-  temp->val = calloc(1, len);
-  memcpy(temp->val, tempval, len);
-  BI_set_bi(res, temp);
-  free(temp);
+  res->len = len;
+  res->sign = sign;
+  free(res->val);
+  res->val = calloc(1, len);
+  memcpy(res->val, tempval, len);
 
   BI_errno = BIERR_ZERO;
   return 0;
