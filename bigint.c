@@ -14,10 +14,10 @@
 static enum BI_error BI_errno = 0;
 
 
-bigint* BI_new(int32_t num)
+bigint* BI_new(int num)
 {
   bigint* bi;
-  uint64_t abs;
+  long int abs;
 
   bi = calloc(1, sizeof(bigint));
   bi->len = 0;
@@ -34,7 +34,9 @@ bigint* BI_new(int32_t num)
   } 
 
   if (num == 0)
+  {
     bi->len = 1;
+  }
 
   return bi;
 }
@@ -42,54 +44,56 @@ bigint* BI_new(int32_t num)
 
 void BI_free(bigint* bi)
 {
-  if (bi == NULL) return;
+  if (bi == NULL)
+  {
+    return;
+  }
   free(bi->val);
   free(bi);
 }
 
 
-enum BI_error BI_set_i(bigint* bi, int32_t num)
+int BI_set_i(bigint* bi, int num)
 {
   if (bi == NULL)
-    return BI_errno = BIERR_NULLARG;
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
 
   bigint* temp = BI_new(num);
   BI_set_bi(bi, temp);
   BI_free(temp);
 
-  return BI_errno = BIERR_ZERO;
+  BI_errno = BIERR_ZERO;
+  return 0;
 }
 
 
-enum BI_error BI_set_bi(bigint* bi, bigint* num)
+int BI_set_bi(bigint* bi, bigint* num)
 {
   if (bi == NULL || num == NULL)
-    return BI_errno = BIERR_NULLARG;
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
 
   bi->sign = num->sign;
   bi->len = num->len;
   bi->val = realloc(bi->val, num->len);
   memcpy(bi->val, num->val, num->len);
 
-  return BI_errno = BIERR_ZERO;
+  BI_errno = BIERR_ZERO;
+  return 0;
 }
 
 
-enum BI_error BI_add(bigint* res, bigint* a, bigint* b)
+int BI_add(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
-    return BI_errno = BIERR_NULLARG;
-
-  /* if the signs don't match up... */
-  if (a->sign != b->sign)
   {
-    /* make sure 'a' is positive and vice versa */
-    if (b->sign == 1)
-    {
-      bigint* temp = a;
-      a = b;
-      b = temp;
-    }
+    BI_errno = BIERR_NULLARG;
+    return -1;
   }
 
   /* result attributes */
@@ -116,11 +120,11 @@ enum BI_error BI_add(bigint* res, bigint* a, bigint* b)
   int asign = a->sign;
   int bsign = b->sign;
 
-  /* if signs are not equal,
-     the larger magnitude value must 
-     be positive, and vice versa */
+  /* if this is going to be subtraction... */
   if (asign != bsign)
   {
+    /* make sure the larger magnitude value is positive,
+       and vice versa */
     if (mag == BI_LESSTHAN)
     {
       a->sign = -1;
@@ -142,7 +146,7 @@ enum BI_error BI_add(bigint* res, bigint* a, bigint* b)
 
   while (i < a->len || j < b->len || carry)
   {
-    int sum = 0, curra = 0, currb = 0;
+    int sum, curra, currb;
 
     curra = (i < a->len ? a->val[i++] * a->sign : 0);
     currb = (j < b->len ? b->val[j++] * b->sign : 0);
@@ -150,13 +154,16 @@ enum BI_error BI_add(bigint* res, bigint* a, bigint* b)
     /* add up 'carry', plus 'curra' and 'currb' values */
     sum = carry + curra + currb;
 
-    /* if this is subtraction, and the magnitude of 'a'
-       is less than 'b'... */
-    if (a->sign != b->sign && sum < 0)
+    carry = 0;
+
+    /* if this is subtraction, and the sum is less than 
+       zero, wrap around and negative carry */
+    if (asign != bsign && sum < 0)
     {
       tempval[k] = 256 - (ABS(sum) % 256);
       carry = -1;
     }
+    /* otherwise, its just addition */
     else
     {
       tempval[k] = ABS(sum) % 256;
@@ -172,24 +179,7 @@ enum BI_error BI_add(bigint* res, bigint* a, bigint* b)
 
     k++;
 
-    /* figure out value of 'carry' */
-    /*if (sum > 255)
-    {
-      carry = 1;
-    }
-    else if (sum < -255)
-    {
-      carry = -1;
-    }
-    else if (a->sign == 1 && sum < 0)
-    {
-      carry = 1;
-    }
-    else
-    {
-      carry = 0;
-    }*/
-
+    /* check len */
     if (tempval[k-1])
     {
       len = k;
@@ -209,31 +199,42 @@ enum BI_error BI_add(bigint* res, bigint* a, bigint* b)
   BI_set_bi(res, temp);
   free(temp);
 
-  return BIERR_ZERO;
+  BI_errno = BIERR_ZERO;
+  return 0;
 }
 
 
-enum BI_error BI_sub(bigint* res, bigint* a, bigint* b)
+int BI_sub(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
-    return BI_errno = BIERR_NULLARG;
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
 
+  /* subtraction is just addition with the right
+     operand's sign flipped */
   int bsign = b->sign;
   b->sign *= -1;
 
-  enum BI_error status = BI_add(res, a, b);
+  int status = BI_add(res, a, b);
 
   if (b != res)
+  {
     b->sign = bsign;
+  }
 
-  return BIERR_ZERO;
+  return status;
 }
 
 
-enum BI_error BI_mul(bigint* res, bigint* a, bigint* b)
+int BI_mul(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
-    return BI_errno = BIERR_NULLARG;
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
 
   int sign = a->sign * b->sign;
 
@@ -248,7 +249,9 @@ enum BI_error BI_mul(bigint* res, bigint* a, bigint* b)
     BI_set_i(temp, 0);
 
     for (int j = 0; j < a->val[i]; j++)
+    {
       BI_add(temp, temp, b);
+    }
 
     unsigned char* fullval = calloc(1, temp->len + i);
     memcpy(fullval + i, temp->val, temp->len);
@@ -265,19 +268,24 @@ enum BI_error BI_mul(bigint* res, bigint* a, bigint* b)
   res->sign = sign;
   BI_free(product);
 
-  return BIERR_ZERO;
+  BI_errno = BIERR_ZERO;
+  return 0;
 }
 
 
-enum BI_error BI_pow(bigint* res, bigint* b, bigint* e)
+int BI_pow(bigint* res, bigint* b, bigint* e)
 {
   if (res == NULL || b == NULL || e == NULL)
-    return BI_errno = BIERR_NULLARG;
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
 
   if (e->sign == -1)
   {
     BI_set_i(res, 0);
-    return BI_errno = BIERR_ZERO;
+    BI_errno = BIERR_ZERO;
+    return 0;
   }
 
   bigint* product = BI_new(1);
@@ -311,14 +319,18 @@ enum BI_error BI_pow(bigint* res, bigint* b, bigint* e)
   BI_set_bi(res, product);
   BI_free(product);
 
-  return BI_errno = BIERR_ZERO;
+  BI_errno = BIERR_ZERO;
+  return 0;
 }
 
 
-enum BI_error BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d)
+int BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d)
 {
   if (n == NULL || d == NULL)
-    return BI_errno = BIERR_NULLARG;
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
 
   int sign = n->sign * d->sign;
   int dsign = d->sign, nsign = n->sign;
@@ -327,7 +339,10 @@ enum BI_error BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d)
 
   bigint* quotient = BI_new(0);
   if (BI_cmp(d, quotient) == BI_EQUAL)
-    return BI_errno = BIERR_DIVZERO;
+  {
+    BI_errno = BIERR_DIVZERO;
+    return -1;
+  }
 
   bigint* temp = BI_new(0);
   BI_add(temp, temp, n);
@@ -359,7 +374,9 @@ enum BI_error BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d)
   }
 
   if (rem)
+  {
     BI_set_bi(rem, temp);
+  }
 
   n->sign = nsign;
   d->sign = dsign;  
@@ -370,17 +387,18 @@ enum BI_error BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d)
   BI_free(two);
   BI_free(subtractor);
 
-  return BIERR_ZERO;
+  BI_errno = BIERR_ZERO;
+  return 0;
 }
 
 
-enum BI_error BI_div(bigint* res, bigint* n, bigint* d)
+int BI_div(bigint* res, bigint* n, bigint* d)
 {
   return BI_div_mod(res, NULL, n, d);
 }
 
 
-enum BI_error BI_mod(bigint* res, bigint* n, bigint* m)
+int BI_mod(bigint* res, bigint* n, bigint* m)
 {
   return BI_div_mod(NULL, res, n, m);
 }
@@ -389,21 +407,31 @@ enum BI_error BI_mod(bigint* res, bigint* n, bigint* m)
 enum BI_comparison BI_cmp(bigint* a, bigint* b)
 {
   if (a->sign > b->sign)
+  {
     return BI_GREATERTHAN;
+  }
 
   if (b->sign > a->sign)
+  {
     return BI_LESSTHAN;
+  }
 
   if (a->len > b->len)
+  {
     return BI_GREATERTHAN;
+  }
 
   if (b->len > a->len)
+  {
     return BI_LESSTHAN;
+  }
 
   for (int i = a->len-1; i >= 0; i--)
   {
     if (a->val[i] == b->val[i])
+    {
       continue;
+    }
     return a->val[i] > b->val[i] ? BI_GREATERTHAN : BI_LESSTHAN;
   }
 
@@ -447,17 +475,36 @@ char* BI_to_str(bigint* bi, int base)
 }
 
 
-void BI_print(bigint* bi)
+int BI_print(bigint* bi)
 {
-  if (bi->sign == -1) printf("-");
+  if (bi == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  if (bi->sign == -1)
+  {
+    printf("-");
+  }
+
   printf("[");
   for (int i = 0; i < bi->len; i++)
   {
     printf("%d", bi->val[i]);
-    if (i < bi->len-1) printf(", ");
+    if (i < bi->len-1)
+    {
+      printf(", ");
+    }
   }
-  if (bi->len == 0) printf("0");
+  if (bi->len == 0)
+  {
+    printf("0");
+  }
   printf("]\n");
+
+  BI_errno = BIERR_ZERO;
+  return 0;
 }
 
 
@@ -466,22 +513,40 @@ void BI_perror(char* context)
   switch(BI_errno)
   {
     case BIERR_ZERO:
-      fprintf(stderr, "%s: Success\n", context);
+      if (context)
+        fprintf(stderr, "%s: Success\n", context);
+      else
+        fprintf(stderr, "Success\n");
       break;
     case BIERR_NULLARG:
-      fprintf(stderr, "%s: Null argument\n", context);
+      if (context)
+        fprintf(stderr, "%s: Null argument\n", context);
+      else
+        fprintf(stderr, "Null argument\n");
       break;
     case BIERR_INVBASE:
-      fprintf(stderr, "%s: Invalid base\n", context);
+      if (context)
+        fprintf(stderr, "%s: Invalid base\n", context);
+      else
+        fprintf(stderr, "Invalid base\n");
       break;
     case BIERR_NOTIMPL:
-      fprintf(stderr, "%s: Feature not yet implemented\n", context);
+      if (context)
+        fprintf(stderr, "%s: Feature not yet implemented\n", context);
+      else
+        fprintf(stderr, "Feature not yet implemented\n");
       break;
     case BIERR_DIVZERO:
-      fprintf(stderr, "%s: Divide by zero\n", context);
+      if (context)
+        fprintf(stderr, "%s: Divide by zero\n", context);
+      else
+        fprintf(stderr, "Divide by zero\n");
       break;
     default:
-      fprintf(stderr, "%s: Unknown error %d\n", context, BI_errno);
+      if (context)
+        fprintf(stderr, "%s: Unknown error %d\n", context, BI_errno);
+      else
+        fprintf(stderr, "Unknown error %d\n", BI_errno);
   }
 }
 

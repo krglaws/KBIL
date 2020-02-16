@@ -29,27 +29,27 @@ struct bigint
   int len;
 };
 
-bigint* BI_new(int32_t num);
+bigint* BI_new(int num);
 
 void BI_free(bigint* bi);
 
-enum BI_error BI_set_i(bigint* bi, int32_t num);
+int BI_set_i(bigint* bi, int num);
 
-enum BI_error BI_set_bi(bigint* bi, bigint* num);
+int BI_set_bi(bigint* bi, bigint* num);
 
-enum BI_error BI_add(bigint* res, bigint* a, bigint* b);
+int BI_add(bigint* res, bigint* a, bigint* b);
 
-enum BI_error BI_sub(bigint* res, bigint* a, bigint* b);
+int BI_sub(bigint* res, bigint* a, bigint* b);
 
-enum BI_error BI_mul(bigint* res, bigint* a, bigint* b);
+int BI_mul(bigint* res, bigint* a, bigint* b);
 
-enum BI_error BI_pow(bigint* res, bigint* b, bigint* e);
+int BI_pow(bigint* res, bigint* b, bigint* e);
 
-enum BI_error BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d);
+int BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d);
 
-enum BI_error BI_div(bigint* res, bigint* n, bigint* d);
+int BI_div(bigint* res, bigint* n, bigint* d);
 
-enum BI_error BI_mod(bigint* res, bigint* n, bigint* m);
+int BI_mod(bigint* res, bigint* n, bigint* m);
 
 enum BI_comparison BI_cmp(bigint* a, bigint* b);
 
@@ -57,7 +57,7 @@ enum BI_comparison BI_cmp_mag(bigint* a, bigint* b);
 
 char* BI_to_str(bigint* bi, int base);
 
-void BI_print(bigint* bi);
+int BI_print(bigint* bi);
 
 void BI_perror(char* context);
 
