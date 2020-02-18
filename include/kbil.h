@@ -37,6 +37,8 @@ int BI_set_i(bigint* bi, int num);
 
 int BI_set_bi(bigint* bi, bigint* num);
 
+int BI_rand(bigint* bi, unsigned int bytes);
+
 int BI_add(bigint* res, bigint* a, bigint* b);
 
 int BI_sub(bigint* res, bigint* a, bigint* b);

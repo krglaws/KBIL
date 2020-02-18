@@ -87,6 +87,34 @@ int BI_set_bi(bigint* bi, bigint* num)
 }
 
 
+int BI_rand(bigint* bi, unsigned int bits)
+{
+  if (bi == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  int rem = bits % 8;
+  int len = (bits / 8) + (rem ? 1 : 0);
+
+  unsigned char val[len];
+
+  for (int i = 0; i < len; i++)
+    val[i] = (unsigned char) rand();
+
+  if (rem)
+    val[len-1] >>= (8 - rem);
+
+  bi->val = realloc(bi->val, len);
+  memcpy(bi->val, val, len);
+  bi->len = len;
+  bi->sign = ((float) rand() / RAND_MAX) < 0.5 ? 1 : -1;
+
+  return 0;
+}
+
+
 int BI_add(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
