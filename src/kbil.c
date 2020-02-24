@@ -13,7 +13,7 @@
 static enum BI_error BI_errno = 0;
 
 
-bigint* BI_new(int num)
+bigint* BI_new_i(int num)
 {
   bigint* bi;
   long int abs;
@@ -38,6 +38,26 @@ bigint* BI_new(int num)
   }
 
   return bi;
+}
+
+
+bigint* BI_new_bi(bigint* num)
+{
+  bigint* bi = BI_new_i(0);
+  BI_set_bi(bi, num);
+  return bi;
+}
+
+
+bigint* BI_new_s(char* s, int base)
+{
+  bigint* bi = BI_new_i(0);
+
+  int slen = strlen(s);
+  for (int i = 0; i < slen; i++)
+  {
+    
+  }
 }
 
 
@@ -115,7 +135,19 @@ int BI_rand(bigint* bi, unsigned int bits)
 }
 
 
-int BI_add(bigint* res, bigint* a, bigint* b)
+int BI_add_i(bigint* res, bigint* a, int i)
+{
+  bigint* b = BI_new(i);
+
+  int result = BI_add(res, a, b);
+
+  BI_free(b);
+
+  return result;
+}
+
+
+int BI_add_bi(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
   {
@@ -229,7 +261,31 @@ int BI_add(bigint* res, bigint* a, bigint* b)
 }
 
 
-int BI_sub(bigint* res, bigint* a, bigint* b)
+int BI_inc(bigint* bi)
+{
+  return BI_add_i(bi, bi, 1);
+}
+
+
+int BI_dec(bigint* bi)
+{
+  return BI_add_i(bi, bi, -1);
+}
+
+
+int BI_sub_i(bigint* res, bigint* a, int i)
+{
+  bigint* I = new(i);
+
+  int result = BI_sub_bi(res, a, I);
+
+  BI_free(I);
+
+  return result;
+}
+
+
+int BI_sub_bi(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
   {
