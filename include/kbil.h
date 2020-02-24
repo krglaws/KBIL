@@ -11,11 +11,11 @@ enum BI_comparison
 
 enum BI_error
 {
-  BIERR_ZERO,
-  BIERR_NULLARG,
-  BIERR_INVBASE,
-  BIERR_NOTIMPL,
-  BIERR_DIVZERO
+  BIERR_ZERO,    // Success
+  BIERR_NULLARG, // Null argument
+  BIERR_INVBASE, // Invalid base
+  BIERR_BADENC,  // Bad encoding
+  BIERR_DIVZERO  // Divide by zero
 };
 
 typedef struct bigint bigint;

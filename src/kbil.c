@@ -15,15 +15,12 @@ static enum BI_error BI_errno = 0;
 
 bigint* BI_new_i(int num)
 {
-  bigint* bi;
-  long int abs;
-
-  bi = calloc(1, sizeof(bigint));
+  bigint* bi = calloc(1, sizeof(bigint));
   bi->len = 0;
   bi->val = calloc(1, 1);
   bi->sign = num < 0 ? -1 : 1;
 
-  abs = ABS(num);
+  long int abs = ABS(num);
 
   while (abs)
   {
@@ -43,21 +40,57 @@ bigint* BI_new_i(int num)
 
 bigint* BI_new_bi(bigint* num)
 {
+  if (num == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return NULL;
+  }
+
   bigint* bi = BI_new_i(0);
+
   BI_set_bi(bi, num);
+
   return bi;
 }
 
 
 bigint* BI_new_s(char* s, int base)
 {
+  if (s == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return NULL;
+  }
+
+  if (base < 2 || base > 16)
+  {
+    BI_errno = BIERR_INVBASE;
+    return -1;
+  }
+
   bigint* bi = BI_new_i(0);
 
   int slen = strlen(s);
   for (int i = 0; i < slen; i++)
   {
-    
+    if (s[i] < '0' && s[i] > '9' &&
+        s[i] < 'A' && s[i] > 'F')
+    {
+      BI_errno = BIERR_BADENC;
+      return NULL;
+    }
+    if ((s[i] <= '9' && s[i] - '0' >= base) ||
+        (s[i] <= 'F' && s[i] - 'A' >= base))
+    {
+      BI_errno = BIERR_BADENC;
+      return NULL;
+    }
+    int curr = s[i] < '9' ? s[i] - '0' : (s[i] - 'A') + 10;
+    BI_add_bii(bi, bi, curr);
   }
+
+  BI_errno = BIERR_ZERO;
+  return bi; 
 }
 
 
@@ -135,19 +168,39 @@ int BI_rand(bigint* bi, unsigned int bits)
 }
 
 
-int BI_add_i(bigint* res, bigint* a, int i)
+int BI_add_ii(bigint* res, int a, int b)
 {
-  bigint* b = BI_new(i);
+  if (res == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+  bigint* abi = BI_new_i(a);
+  bigint* bbi = BI_new_i(b);
 
-  int result = BI_add(res, a, b);
+  int result = BI_add_bibi(res, abi, bbi);
 
-  BI_free(b);
+  BI_free(abi);
+  BI_free(bbi);
+
+  BI_errno = BIERR_ZERO;
+  return 0;
+}
+
+
+int BI_add_bii(bigint* res, bigint* a, int b)
+{
+  bigint* bi = BI_new(b);
+
+  int result = BI_add(res, a, bi);
+
+  BI_free(bi);
 
   return result;
 }
 
 
-int BI_add_bi(bigint* res, bigint* a, bigint* b)
+int BI_add_bibi(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
   {
@@ -273,19 +326,45 @@ int BI_dec(bigint* bi)
 }
 
 
-int BI_sub_i(bigint* res, bigint* a, int i)
+int BI_sub_ii(bigint* res, int a, int b)
 {
-  bigint* I = new(i);
+  if (res == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
 
-  int result = BI_sub_bi(res, a, I);
+  bigint* abi = BI_new_i(a);
+  bigint* bbi = BI_new_i(b);
 
-  BI_free(I);
+  int result = BI_sub_bibi(res, abi, bbi);
+
+  BI_free(abi);
+  BI_free(bbi);
 
   return result;
 }
 
 
-int BI_sub_bi(bigint* res, bigint* a, bigint* b)
+int BI_sub_bii(bigint* res, bigint* a, int b)
+{
+  if (res == NULL || a == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* bbi = BI_new_i(b);
+
+  int result = BI_sub_bibi(res, a, bbi);
+
+  BI_free(bbi);
+
+  return result;
+}
+
+
+int BI_sub_bibi(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
   {
@@ -309,7 +388,41 @@ int BI_sub_bi(bigint* res, bigint* a, bigint* b)
 }
 
 
-int BI_mul(bigint* res, bigint* a, bigint* b)
+int BI_mul_ii(bigint* res, int a, int b)
+{
+  if (res == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* abi = BI_new_i(a);
+  bigint* bbi = BI_new_i(b);
+
+  int result = BI_mul_bibi(res, abi, bbi);
+
+  BI_free(abi);
+  BI_free(bbi);
+
+  return result;
+}
+
+
+int BI_mul_bii(bigint* res, bigint* a, int b)
+{
+  if (res == NULL || a == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* bbi = BI_new_i(b);
+
+  int result = BI_add_bibi(a, bbi);
+}
+
+
+int BI_mul_bibi(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
   {
