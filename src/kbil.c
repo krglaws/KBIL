@@ -1,5 +1,4 @@
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -659,7 +658,8 @@ int BI_div_mod_bb(bigint* res, bigint* rem, bigint* n, bigint* d)
   }
 
   BI_set_i(res, 0);
-  BI_set_b(rem, n);
+  if (rem != n)
+    BI_set_b(rem, n);
 
   bigint* multiplier = BI_new_i(1);
   bigint* subtractor = BI_new_b(d);
