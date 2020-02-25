@@ -1,7 +1,10 @@
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#include <math.h>
 #include <kbil.h>
 
 
@@ -34,11 +37,12 @@ bigint* BI_new_i(int num)
     bi->len = 1;
   }
 
+  BI_errno = BIERR_ZERO;
   return bi;
 }
 
 
-bigint* BI_new_bi(bigint* num)
+bigint* BI_new_b(bigint* num)
 {
   if (num == NULL)
   {
@@ -48,8 +52,9 @@ bigint* BI_new_bi(bigint* num)
 
   bigint* bi = BI_new_i(0);
 
-  BI_set_bi(bi, num);
+  BI_set_b(bi, num);
 
+  BI_errno = BIERR_ZERO;
   return bi;
 }
 
@@ -65,7 +70,7 @@ bigint* BI_new_s(char* s, int base)
   if (base < 2 || base > 16)
   {
     BI_errno = BIERR_INVBASE;
-    return -1;
+    return NULL;
   }
 
   bigint* bi = BI_new_i(0);
@@ -85,8 +90,9 @@ bigint* BI_new_s(char* s, int base)
       BI_errno = BIERR_BADENC;
       return NULL;
     }
+
     int curr = s[i] < '9' ? s[i] - '0' : (s[i] - 'A') + 10;
-    BI_add_bii(bi, bi, curr);
+    BI_add_bi(bi, bi, curr);
   }
 
   BI_errno = BIERR_ZERO;
@@ -100,6 +106,7 @@ void BI_free(bigint* bi)
   {
     return;
   }
+
   free(bi->val);
   free(bi);
 }
@@ -113,8 +120,8 @@ int BI_set_i(bigint* bi, int num)
     return -1;
   }
 
-  bigint* temp = BI_new(num);
-  BI_set_bi(bi, temp);
+  bigint* temp = BI_new_i(num);
+  BI_set_b(bi, temp);
   BI_free(temp);
 
   BI_errno = BIERR_ZERO;
@@ -122,7 +129,7 @@ int BI_set_i(bigint* bi, int num)
 }
 
 
-int BI_set_bi(bigint* bi, bigint* num)
+int BI_set_b(bigint* bi, bigint* num)
 {
   if (bi == NULL || num == NULL)
   {
@@ -175,10 +182,11 @@ int BI_add_ii(bigint* res, int a, int b)
     BI_errno = BIERR_NULLARG;
     return -1;
   }
+
   bigint* abi = BI_new_i(a);
   bigint* bbi = BI_new_i(b);
 
-  int result = BI_add_bibi(res, abi, bbi);
+  int result = BI_add_bb(res, abi, bbi);
 
   BI_free(abi);
   BI_free(bbi);
@@ -188,19 +196,25 @@ int BI_add_ii(bigint* res, int a, int b)
 }
 
 
-int BI_add_bii(bigint* res, bigint* a, int b)
+int BI_add_bi(bigint* res, bigint* a, int b)
 {
-  bigint* bi = BI_new(b);
+  if (res == NULL || a == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
 
-  int result = BI_add(res, a, bi);
+  bigint* bbi = BI_new_i(b);
 
-  BI_free(bi);
+  int result = BI_add_bb(res, a, bbi);
+
+  BI_free(bbi);
 
   return result;
 }
 
 
-int BI_add_bibi(bigint* res, bigint* a, bigint* b)
+int BI_add_bb(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
   {
@@ -208,13 +222,10 @@ int BI_add_bibi(bigint* res, bigint* a, bigint* b)
     return -1;
   }
 
-  /* result attributes */
   int sign = 1, len = 1;
 
-  /* compare magnitudes of 'a' and 'b' */
-  enum BI_comparison mag = BI_cmp_mag(a, b);
+  enum BI_comparison mag = BI_cmp_mag_bb(a, b);
 
-  /* figure out if result is signed */
   if (a->sign == -1 && b->sign == -1)
   {
     sign = -1;
@@ -228,15 +239,11 @@ int BI_add_bibi(bigint* res, bigint* a, bigint* b)
     sign = -1;
   }
 
-  /* save signs */
   int asign = a->sign;
   int bsign = b->sign;
 
-  /* if this is going to be subtraction... */
   if (asign != bsign)
   {
-    /* make sure the larger magnitude value is positive,
-       and vice versa */
     if (mag == BI_LESSTHAN)
     {
       a->sign = -1;
@@ -249,11 +256,9 @@ int BI_add_bibi(bigint* res, bigint* a, bigint* b)
     }
   }
 
-  /* temporary result array */
   int templen = 1 + MAX(a->len, b->len);
   unsigned char tempval[templen];
 
-  /* loop until addition is complete */
   int i = 0, j = 0, k = 0, carry = 0;
 
   while (i < a->len || j < b->len || carry)
@@ -263,19 +268,14 @@ int BI_add_bibi(bigint* res, bigint* a, bigint* b)
     curra = (i < a->len ? a->val[i++] * a->sign : 0);
     currb = (j < b->len ? b->val[j++] * b->sign : 0);
 
-    /* add up 'carry', plus 'curra' and 'currb' values */
     sum = carry + curra + currb;
-
     carry = 0;
 
-    /* if this is subtraction, and the sum is less than 
-       zero, wrap around and negative carry */
     if (asign != bsign && sum < 0)
     {
       tempval[k] = 256 - (ABS(sum) % 256);
       carry = -1;
     }
-    /* otherwise, its just addition */
     else
     {
       tempval[k] = ABS(sum) % 256;
@@ -291,18 +291,15 @@ int BI_add_bibi(bigint* res, bigint* a, bigint* b)
 
     k++;
 
-    /* check len */
     if (tempval[k-1])
     {
       len = k;
     }
   }
 
-  /* restore signs */
   a->sign = asign;
   b->sign = bsign;
 
-  /* transfer result into 'res' param */
   res->len = len;
   res->sign = sign;
   free(res->val);
@@ -316,13 +313,13 @@ int BI_add_bibi(bigint* res, bigint* a, bigint* b)
 
 int BI_inc(bigint* bi)
 {
-  return BI_add_i(bi, bi, 1);
+  return BI_add_bi(bi, bi, 1);
 }
 
 
 int BI_dec(bigint* bi)
 {
-  return BI_add_i(bi, bi, -1);
+  return BI_sub_bi(bi, bi, 1);
 }
 
 
@@ -337,7 +334,7 @@ int BI_sub_ii(bigint* res, int a, int b)
   bigint* abi = BI_new_i(a);
   bigint* bbi = BI_new_i(b);
 
-  int result = BI_sub_bibi(res, abi, bbi);
+  int result = BI_sub_bb(res, abi, bbi);
 
   BI_free(abi);
   BI_free(bbi);
@@ -346,7 +343,7 @@ int BI_sub_ii(bigint* res, int a, int b)
 }
 
 
-int BI_sub_bii(bigint* res, bigint* a, int b)
+int BI_sub_bi(bigint* res, bigint* a, int b)
 {
   if (res == NULL || a == NULL)
   {
@@ -356,7 +353,7 @@ int BI_sub_bii(bigint* res, bigint* a, int b)
 
   bigint* bbi = BI_new_i(b);
 
-  int result = BI_sub_bibi(res, a, bbi);
+  int result = BI_sub_bb(res, a, bbi);
 
   BI_free(bbi);
 
@@ -364,7 +361,25 @@ int BI_sub_bii(bigint* res, bigint* a, int b)
 }
 
 
-int BI_sub_bibi(bigint* res, bigint* a, bigint* b)
+int BI_sub_ib(bigint* res, int a, bigint* b)
+{
+  if (res == NULL || b == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* abi = BI_new_i(a);
+
+  int result = BI_sub_bb(res, abi, b);
+
+  BI_free(abi);
+
+  return result;
+}
+
+
+int BI_sub_bb(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
   {
@@ -372,12 +387,10 @@ int BI_sub_bibi(bigint* res, bigint* a, bigint* b)
     return -1;
   }
 
-  /* subtraction is just addition with the right
-     operand's sign flipped */
   int bsign = b->sign;
   b->sign *= -1;
 
-  int status = BI_add(res, a, b);
+  int status = BI_add_bb(res, a, b);
 
   if (b != res)
   {
@@ -399,7 +412,7 @@ int BI_mul_ii(bigint* res, int a, int b)
   bigint* abi = BI_new_i(a);
   bigint* bbi = BI_new_i(b);
 
-  int result = BI_mul_bibi(res, abi, bbi);
+  int result = BI_mul_bb(res, abi, bbi);
 
   BI_free(abi);
   BI_free(bbi);
@@ -408,7 +421,7 @@ int BI_mul_ii(bigint* res, int a, int b)
 }
 
 
-int BI_mul_bii(bigint* res, bigint* a, int b)
+int BI_mul_bi(bigint* res, bigint* a, int b)
 {
   if (res == NULL || a == NULL)
   {
@@ -418,11 +431,15 @@ int BI_mul_bii(bigint* res, bigint* a, int b)
 
   bigint* bbi = BI_new_i(b);
 
-  int result = BI_add_bibi(a, bbi);
+  int result = BI_mul_bb(res, a, bbi);
+
+  BI_free(bbi);
+
+  return result;
 }
 
 
-int BI_mul_bibi(bigint* res, bigint* a, bigint* b)
+int BI_mul_bb(bigint* res, bigint* a, bigint* b)
 {
   if (res == NULL || a == NULL || b == NULL)
   {
@@ -435,8 +452,8 @@ int BI_mul_bibi(bigint* res, bigint* a, bigint* b)
   int bsign = b->sign;
   b->sign = 1;
 
-  bigint* product = BI_new(0);
-  bigint* temp = BI_new(0);
+  bigint* product = BI_new_i(0);
+  bigint* temp = BI_new_i(0);
 
   for (int i = 0; i < a->len; i++)
   {
@@ -444,7 +461,7 @@ int BI_mul_bibi(bigint* res, bigint* a, bigint* b)
 
     for (int j = 0; j < a->val[i]; j++)
     {
-      BI_add(temp, temp, b);
+      BI_add_bb(temp, temp, b);
     }
 
     unsigned char* fullval = calloc(1, temp->len + i);
@@ -453,12 +470,12 @@ int BI_mul_bibi(bigint* res, bigint* a, bigint* b)
     temp->val = fullval;
     temp->len += i;
 
-    BI_add(product, product, temp);
+    BI_add_bb(product, product, temp);
   }
 
   BI_free(temp);
   b->sign = bsign;
-  BI_set_bi(res, product);
+  BI_set_b(res, product);
   res->sign = sign;
   BI_free(product);
 
@@ -467,7 +484,63 @@ int BI_mul_bibi(bigint* res, bigint* a, bigint* b)
 }
 
 
-int BI_pow(bigint* res, bigint* b, bigint* e)
+int BI_pow_ii(bigint* res, int b, int e)
+{
+  if (res == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* bbi = BI_new_i(b);
+  bigint* ebi = BI_new_i(e);
+
+  int result = BI_pow_bb(res, bbi, ebi);
+
+  BI_free(bbi);
+  BI_free(ebi);
+
+  return result;
+}
+
+
+int BI_pow_bi(bigint* res, bigint* b, int e)
+{
+  if (res == NULL || b == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* ebi = BI_new_i(e);
+
+  int result = BI_pow_bb(res, b, ebi);
+
+  BI_free(ebi);
+
+  return result;
+}
+
+
+int BI_pow_ib(bigint* res, int b, bigint* e)
+{
+  if (res == NULL || e == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* bbi = BI_new_i(b);
+
+  int result = BI_pow_bb(res, bbi, e);
+
+  BI_free(bbi);
+
+  return result;
+}
+
+
+int BI_pow_bb(bigint* res, bigint* b, bigint* e)
 {
   if (res == NULL || b == NULL || e == NULL)
   {
@@ -482,45 +555,93 @@ int BI_pow(bigint* res, bigint* b, bigint* e)
     return 0;
   }
 
-  bigint* product = BI_new(1);
-  bigint* temp = BI_new(0);
-  BI_set_bi(temp, b);
-  bigint* zero = BI_new(0);
-  bigint* two = BI_new(2);
-  bigint* powcount = BI_new(0);
-  BI_set_bi(powcount, e);
-  bigint* currpow = BI_new(1);
+  BI_set_i(res, 1);
+  bigint* temp = BI_new_b(b);
+  bigint* powcount = BI_new_b(e);
+  bigint* currpow = BI_new_i(1);
 
-  while (BI_cmp(powcount, zero) != BI_EQUAL)
+  while (BI_cmp_bi(powcount, 0) != BI_EQUAL)
   {
-    if (BI_cmp(currpow, powcount) == BI_GREATERTHAN)
+    if (BI_cmp_bb(currpow, powcount) == BI_GREATERTHAN)
     {
       BI_set_i(currpow, 1);
-      BI_set_bi(temp, b);
+      BI_set_b(temp, b);
     }
 
-    BI_mul(product, product, temp);
-    BI_sub(powcount, powcount, currpow);
-    BI_mul(currpow, currpow, two);
-    BI_mul(temp, temp, temp);
+    BI_mul_bb(res, res, temp);
+    BI_sub_bb(powcount, powcount, currpow);
+    BI_mul_bi(currpow, currpow, 2);
+    BI_mul_bb(temp, temp, temp);
   }
 
   BI_free(temp);
-  BI_free(zero);
-  BI_free(two);
   BI_free(powcount);
   BI_free(currpow);
-  BI_set_bi(res, product);
-  BI_free(product);
 
   BI_errno = BIERR_ZERO;
   return 0;
 }
 
 
-int BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d)
+int BI_div_mod_ii(bigint* res, bigint* rem, int n, int d)
 {
-  if (n == NULL || d == NULL)
+  if (res == NULL || rem == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* nbi = BI_new_i(n);
+  bigint* dbi = BI_new_i(d);
+
+  int result = BI_div_mod_bb(res, rem, nbi, dbi);
+
+  BI_free(nbi);
+  BI_free(dbi);
+
+  return result;
+}
+
+
+int BI_div_mod_bi(bigint* res, bigint* rem, bigint* n, int d)
+{
+  if (res == NULL || rem == NULL || n == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* dbi = BI_new_i(d);
+
+  int result = BI_div_mod_bb(res, rem, n, dbi);
+
+  BI_free(dbi);
+
+  return result;
+}
+
+
+int BI_div_mod_ib(bigint* res, bigint* rem, int n, bigint* d)
+{
+  if (res == NULL || rem == NULL || d == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* nbi = BI_new_i(n);
+
+  int result = BI_div_mod_bb(res, rem, nbi, d);
+
+  BI_free(nbi);
+
+  return result;
+}
+
+
+int BI_div_mod_bb(bigint* res, bigint* rem, bigint* n, bigint* d)
+{
+  if (res == NULL || rem == NULL || n == NULL || d == NULL)
   {
     BI_errno = BIERR_NULLARG;
     return -1;
@@ -531,54 +652,40 @@ int BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d)
   n->sign = 1;
   d->sign = 1;
 
-  bigint* quotient = BI_new(0);
-  if (BI_cmp(d, quotient) == BI_EQUAL)
+  if (BI_cmp_bi(d, 0) == BI_EQUAL)
   {
     BI_errno = BIERR_DIVZERO;
     return -1;
   }
 
-  bigint* temp = BI_new(0);
-  BI_add(temp, temp, n);
+  BI_set_i(res, 0);
+  BI_set_b(rem, n);
 
-  bigint* multiplier = BI_new(1);
-  bigint* two = BI_new(2);
-  bigint* subtractor = BI_new(0);
-  BI_add(subtractor, subtractor, d);
+  bigint* multiplier = BI_new_i(1);
+  bigint* subtractor = BI_new_b(d);
 
-  while (BI_cmp(temp, d) != BI_LESSTHAN)
+  while (BI_cmp_bb(rem, d) != BI_LESSTHAN)
   {
-    if (BI_cmp(subtractor, temp) == BI_GREATERTHAN)
+    if (BI_cmp_bb(subtractor, rem) == BI_GREATERTHAN)
     {
-      BI_set_bi(subtractor, d);
+      BI_set_b(subtractor, d);
       BI_set_i(multiplier, 1);
       continue;
     }
-    BI_sub(temp, temp, subtractor);
-    BI_add(quotient, quotient, multiplier);
 
-    BI_mul(subtractor, two, subtractor);
-    BI_mul(multiplier, multiplier, two);
+    BI_sub_bb(rem, rem, subtractor);
+    BI_add_bb(res, res, multiplier);
+
+    BI_mul_bi(subtractor, subtractor, 2);
+    BI_mul_bi(multiplier, multiplier, 2);
   }
 
-  if (res)
-  { 
-    BI_set_bi(res, quotient);
-    res->sign = sign;
-  }
-
-  if (rem)
-  {
-    BI_set_bi(rem, temp);
-  }
+  res->sign = sign;
 
   n->sign = nsign;
   d->sign = dsign;  
 
-  BI_free(quotient);
-  BI_free(temp);
   BI_free(multiplier);
-  BI_free(two);
   BI_free(subtractor);
 
   BI_errno = BIERR_ZERO;
@@ -586,20 +693,180 @@ int BI_div_mod(bigint* res, bigint* rem, bigint* n, bigint* d)
 }
 
 
-int BI_div(bigint* res, bigint* n, bigint* d)
+int BI_div_ii(bigint* res, int n, int d)
 {
-  return BI_div_mod(res, NULL, n, d);
+  if (res == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* nbi = BI_new_i(n);
+  bigint* dbi = BI_new_i(d);
+
+  int result = BI_div_bb(res, nbi, dbi);
+
+  BI_free(nbi);
+  BI_free(dbi);
+
+  return result;
 }
 
 
-int BI_mod(bigint* res, bigint* n, bigint* m)
+int BI_div_bi(bigint* res, bigint* n, int d)
 {
-  return BI_div_mod(NULL, res, n, m);
+  if (res == NULL || n == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* dbi = BI_new_i(d);
+
+  int result = BI_div_bb(res, n, dbi);
+
+  BI_free(dbi);
+
+  return result;
 }
 
 
-enum BI_comparison BI_cmp(bigint* a, bigint* b)
+int BI_div_ib(bigint* res, int n, bigint* d)
 {
+  if (res == NULL || d == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* nbi = BI_new_i(n);
+
+  int result = BI_div_bb(res, nbi, d);
+
+  BI_free(nbi);
+
+  return result;
+}
+
+
+int BI_div_bb(bigint* res, bigint* n, bigint* d)
+{
+  if (res == NULL || n == NULL || d == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* tmp = BI_new_i(0);
+
+  int result = BI_div_mod_bb(res, tmp, n, d);
+
+  BI_free(tmp);
+
+  return result;
+}
+
+
+int BI_mod_ii(bigint* res, int n, int m)
+{
+  if (res == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* nbi = BI_new_i(n);
+  bigint* mbi = BI_new_i(m);
+
+  int result = BI_mod_bb(res, nbi, mbi);
+
+  BI_free(nbi);
+  BI_free(mbi);
+
+  return result;
+}
+
+
+int BI_mod_bi(bigint* res, bigint* n, int m)
+{
+  if (res == NULL || n == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* mbi = BI_new_i(m);
+
+  int result = BI_mod_bb(res, n, mbi);
+
+  BI_free(mbi);
+
+  return result;
+}
+
+
+int BI_mod_ib(bigint* res, int n, bigint* m)
+{
+  if (res == NULL || m == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* nbi = BI_new_i(n);
+
+  int result = BI_mod_bb(res, nbi, m);
+
+  BI_free(nbi);
+
+  return result;
+}
+
+
+int BI_mod_bb(bigint* res, bigint* n, bigint* m)
+{
+  if (res == NULL || n == NULL || m == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* tmp = BI_new_i(0);
+
+  int result = BI_div_mod_bb(tmp, res, n, m);
+
+  BI_free(tmp);
+
+  return result;
+}
+
+
+enum BI_comparison BI_cmp_bi(bigint* a, int b)
+{
+  if (a == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* bbi = BI_new_i(b);
+
+  enum BI_comparison cmp = BI_cmp_bb(a, bbi);
+
+  BI_free(bbi);
+
+  return cmp;
+}
+
+
+enum BI_comparison BI_cmp_bb(bigint* a, bigint* b)
+{
+  if (a == NULL || b == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
   if (a->sign > b->sign)
   {
     return BI_GREATERTHAN;
@@ -626,6 +893,7 @@ enum BI_comparison BI_cmp(bigint* a, bigint* b)
     {
       continue;
     }
+
     return a->val[i] > b->val[i] ? BI_GREATERTHAN : BI_LESSTHAN;
   }
 
@@ -633,15 +901,39 @@ enum BI_comparison BI_cmp(bigint* a, bigint* b)
 }
 
 
-enum BI_comparison BI_cmp_mag(bigint* a, bigint* b)
+enum BI_comparison BI_cmp_mag_bi(bigint* a, int b)
 {
+  if (a == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  bigint* bbi = BI_new_i(b);
+
+  enum BI_comparison cmp = BI_cmp_mag_bb(a, bbi);
+
+  BI_free(bbi);
+
+  return cmp;
+}
+
+
+enum BI_comparison BI_cmp_mag_bb(bigint* a, bigint* b)
+{
+  if (a == NULL || b == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
   int a_sign = a->sign;
   int b_sign = b->sign;
 
   a->sign = 1;
   b->sign = 1;
 
-  enum BI_comparison result = BI_cmp(a, b);
+  enum BI_comparison result = BI_cmp_bb(a, b);
 
   a->sign = a_sign;
   b->sign = b_sign;
@@ -658,14 +950,76 @@ char* BI_to_str(bigint* bi, int base)
     return NULL;
   }
 
-  if (base < 2 && base > 36)
+  if (base < 2 || base > 16)
   {
     BI_errno = BIERR_INVBASE;
     return NULL;
   }
 
-  BI_errno = BIERR_NOTIMPL;
-  return NULL;
+  bigint* quo = BI_new_i(0);
+  BI_div_bi(quo, bi, base);
+
+  if (BI_cmp_bi(quo, 1023) == BI_GREATERTHAN)
+  {
+    BI_errno = BIERR_TOOBIG;
+    return NULL;
+  }
+
+  int len;
+  BI_to_int(quo, &len);
+  BI_free(quo);
+  len += 2;
+
+  bigint* num = BI_new_b(bi);
+  bigint* rem = BI_new_i(0);
+  bigint* den = BI_new_i(base);
+
+  int i = len - 2;
+  char* s = calloc(1, len);
+
+  do
+  {
+    BI_div_mod_bb(num, rem, num, den);
+    int curr;
+    BI_to_int(rem, &curr);
+    if (curr < 9)
+      s[i--] = curr + '0';
+    else
+      s[i--] = curr + 'A';
+  } while (BI_cmp_bi(num, 0) == BI_GREATERTHAN);
+
+  BI_free(num);
+  BI_free(rem);
+  BI_free(den);
+
+  BI_errno = BIERR_ZERO;
+  return s;
+}
+
+
+int BI_to_int(bigint* bi, int* i)
+{
+  if (bi == NULL || i == NULL)
+  {
+    BI_errno = BIERR_NULLARG;
+    return -1;
+  }
+
+  if (BI_cmp_bi(bi, INT_MAX) == BI_GREATERTHAN)
+  {
+    BI_errno = BIERR_TOOBIG;
+    return -1;
+  }
+
+  for (int j = 0; j < bi->len; i++)
+  {
+    *i += bi->val[j] * pow(256, j);
+  }
+
+  *i *= bi->sign;
+
+  BI_errno = BIERR_ZERO;
+  return 0;
 }
 
 
@@ -724,11 +1078,11 @@ void BI_perror(char* context)
       else
         fprintf(stderr, "Invalid base\n");
       break;
-    case BIERR_NOTIMPL:
+    case BIERR_BADENC:
       if (context)
-        fprintf(stderr, "%s: Feature not yet implemented\n", context);
+        fprintf(stderr, "%s: Bad encoding\n", context);
       else
-        fprintf(stderr, "Feature not yet implemented\n");
+        fprintf(stderr, "Bad encoding\n");
       break;
     case BIERR_DIVZERO:
       if (context)
@@ -736,6 +1090,11 @@ void BI_perror(char* context)
       else
         fprintf(stderr, "Divide by zero\n");
       break;
+    case BIERR_TOOBIG:
+      if (context)
+        fprintf(stderr, "%s: Value is too big for operation\n", context);
+      else
+        fprintf(stderr, "Value is too big for operation\n");
     default:
       if (context)
         fprintf(stderr, "%s: Unknown error %d\n", context, BI_errno);
