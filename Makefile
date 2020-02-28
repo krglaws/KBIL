@@ -1,9 +1,11 @@
 
 CC := gcc
-CFLAGS := -fPIC -Iinclude -std=c99
+CFLAGS := -fPIC -Iinclude -std=c99 -lm
+DEBFLAGS := -Iinclude -std=c99 -lm -g
 
 SRC := ./src
 INC := ./include
+TST := ./test
 BIN := ./bin
 
 INCLOC := /usr/include
@@ -12,11 +14,18 @@ LIBLOC := /usr/lib
 default: all
 
 
-KBILSRC := $(SRC)/kbil.c
+KBILDEPS := $(SRC)/kbil.c
 KBILTARG := $(BIN)/kbil.o
 
-$(KBILTARG): $(KBILSRC)
+$(KBILTARG): $(KBILDEPS)
 	$(CC) -c $< -o $@ $(CFLAGS)
+
+
+KBILTESTDEPS := $(KBILDEPS)
+KBILTESTTARG := $(BIN)/kbiltests.out
+
+$(KBILTESTTARG): $(TST)/test.c $(KBILTESTDEPS)
+	$(CC) $^ -o $@ $(DEBFLAGS)
 
 
 STATICLIB := libkbil.a
@@ -28,7 +37,23 @@ $(STATICLIB): $(KBILTARG)
 DYNAMICLIB := libkbil.so
 
 $(DYNAMICLIB): $(KBILTARG)
-	gcc -shared -o $@ $<	
+	gcc -shared -o $@ $<
+
+
+.PHONY: build_tests
+build_tests: $(KBILTESTTARG)
+
+
+.PHONY: run_tests
+run_tests: buid_tests
+	@echo "Running tests..."
+	@echo "======================"
+	@echo "----------------------"
+	@./bin/kbiltests.out
+	@if [ $? != 0 ]; then; echo "Tests failed."; else echo "All tests passed."; fi;
+	@echo "----------------------"
+	@echo "======================"
+	@echo "Done."
 
 
 .PHONY: install
