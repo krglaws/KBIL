@@ -18,22 +18,18 @@ static enum BI_error BI_errno = 0;
 bigint* BI_new_i(int num)
 {
   bigint* bi = calloc(1, sizeof(bigint));
-  bi->len = 0;
-  bi->val = calloc(1, 1);
+  
+  long int abs = ABS(num);
+  long int temp = abs;
+  bi->len = 1;
+  while (temp /= 256) bi->len++;
+  bi->val = calloc(1, bi->len);
   bi->sign = num < 0 ? -1 : 1;
 
-  long int abs = ABS(num);
-
-  while (abs)
+  for (int i = 0; i < bi->len; i++)
   {
-    bi->val[bi->len] = abs % 256;
-    bi->val = realloc(bi->val, ++bi->len);
+    bi->val[i] = abs % 256;
     abs /= 256;
-  } 
-
-  if (num == 0)
-  {
-    bi->len = 1;
   }
 
   BI_errno = BIERR_ZERO;
@@ -71,11 +67,18 @@ bigint* BI_new_s(char* s, int base)
     BI_errno = BIERR_INVBASE;
     return NULL;
   }
+  int sign = 1;
+  
+  if (s[0] == '-')
+  {
+    sign = -1;
+    s++;
+  }
 
   bigint* bi = BI_new_i(0);
-
+  bigint* prod = BI_new_i(0);
   int slen = strlen(s);
-  for (int i = 0; i < slen; i++)
+  for (int i = slen - 1; i >= 0; i--)
   {
     if (s[i] < '0' && s[i] > '9' &&
         s[i] < 'A' && s[i] > 'F')
@@ -91,9 +94,14 @@ bigint* BI_new_s(char* s, int base)
     }
 
     int curr = s[i] < '9' ? s[i] - '0' : (s[i] - 'A') + 10;
-    BI_add_bi(bi, bi, curr);
-  }
 
+    BI_pow_ii(prod, base, (slen - 1) - i);
+    BI_mul_bi(prod, prod, curr);
+    BI_add_bb(bi, bi, prod);
+  }
+  BI_free(prod);
+
+  bi->sign = sign;
   BI_errno = BIERR_ZERO;
   return bi; 
 }
@@ -956,28 +964,44 @@ char* BI_to_str(bigint* bi, int base)
     return NULL;
   }
 
-  bigint* quo = BI_new_i(0);
-  BI_div_bi(quo, bi, base);
-
-  if (BI_cmp_bi(quo, 1023) == BI_GREATERTHAN)
+  int len = 0;
+  bigint* quo = BI_new_b(bi);
+  do
   {
-    BI_errno = BIERR_TOOBIG;
-    return NULL;
-  }
-
-  int len;
-  BI_to_int(quo, &len);
+    BI_div_bi(quo, quo, base);
+    len++;
+    if (len > 1024)
+    {
+      BI_free(quo);
+      BI_errno = BIERR_TOOBIG;
+      return NULL;
+    }
+  } while (BI_cmp_bi(quo, 0) == BI_GREATERTHAN);
   BI_free(quo);
-  len += 2;
 
   bigint* num = BI_new_b(bi);
   bigint* rem = BI_new_i(0);
   bigint* den = BI_new_i(base);
 
-  int i = len - 2;
-  char* s = calloc(1, len);
+  // add one for NULL terminator
+  len++;
 
-  do
+  // add one if signed
+  if (bi->sign == -1)
+  {
+    len++;
+  }
+
+  char* s = calloc(1, len);
+  int i;
+  if (bi->sign == -1)
+  {
+    s[0] = '-';
+    i = 1;
+  }
+  else i = 0;
+
+  for (; i < len; i++)
   {
     BI_div_mod_bb(num, rem, num, den);
     int curr;
@@ -986,7 +1010,7 @@ char* BI_to_str(bigint* bi, int base)
       s[i--] = curr + '0';
     else
       s[i--] = curr + 'A';
-  } while (BI_cmp_bi(num, 0) == BI_GREATERTHAN);
+  }
 
   BI_free(num);
   BI_free(rem);
@@ -1011,7 +1035,7 @@ int BI_to_int(bigint* bi, int* i)
     return -1;
   }
 
-  for (int j = 0; j < bi->len; i++)
+  for (int j = 0; j < bi->len; j++)
   {
     *i += bi->val[j] * pow(256, j);
   }
