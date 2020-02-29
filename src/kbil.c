@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
-#include <math.h>
 #include <kbil.h>
 
 
@@ -394,9 +393,17 @@ int BI_sub_bb(bigint* res, bigint* a, bigint* b)
     return -1;
   }
 
+  if (a == b)
+  {
+    b = BI_new_b(a);
+    b->sign *= -1;
+    int status = BI_add_bb(res, a, b);
+    BI_free(b);
+    return status;
+  }
+
   int bsign = b->sign;
   b->sign *= -1;
-
   int status = BI_add_bb(res, a, b);
 
   if (b != res)
@@ -562,7 +569,7 @@ int BI_pow_bb(bigint* res, bigint* b, bigint* e)
     return 0;
   }
 
-  BI_set_i(res, 1);
+  bigint* prod = BI_new_i(1);
   bigint* temp = BI_new_b(b);
   bigint* powcount = BI_new_b(e);
   bigint* currpow = BI_new_i(1);
@@ -575,12 +582,14 @@ int BI_pow_bb(bigint* res, bigint* b, bigint* e)
       BI_set_b(temp, b);
     }
 
-    BI_mul_bb(res, res, temp);
+    BI_mul_bb(prod, prod, temp);
     BI_sub_bb(powcount, powcount, currpow);
     BI_mul_bi(currpow, currpow, 2);
     BI_mul_bb(temp, temp, temp);
   }
 
+  BI_set_b(res, prod);
+  BI_free(prod);
   BI_free(temp);
   BI_free(powcount);
   BI_free(currpow);
@@ -654,45 +663,56 @@ int BI_div_mod_bb(bigint* res, bigint* rem, bigint* n, bigint* d)
     return -1;
   }
 
-  int sign = n->sign * d->sign;
-  int dsign = d->sign, nsign = n->sign;
-  n->sign = 1;
-  d->sign = 1;
-
   if (BI_cmp_bi(d, 0) == BI_EQUAL)
   {
     BI_errno = BIERR_DIVZERO;
     return -1;
   }
 
-  BI_set_i(res, 0);
-  if (rem != n)
-    BI_set_b(rem, n);
+  int sign = n->sign * d->sign;
+
+  bigint* quotient = BI_new_i(0);
+
+  bigint* remainder = BI_new_b(n);
+  remainder->sign = 1;
+
+  bigint* denominator = BI_new_b(d);
+  denominator->sign = 1;
 
   bigint* multiplier = BI_new_i(1);
-  bigint* subtractor = BI_new_b(d);
+  bigint* subtractor = BI_new_b(denominator);
 
-  while (BI_cmp_bb(rem, d) != BI_LESSTHAN)
+  while (BI_cmp_bb(remainder, denominator) != BI_LESSTHAN)
   {
-    if (BI_cmp_bb(subtractor, rem) == BI_GREATERTHAN)
+    if (BI_cmp_bb(subtractor, remainder) == BI_GREATERTHAN)
     {
-      BI_set_b(subtractor, d);
+      BI_set_b(subtractor, denominator);
       BI_set_i(multiplier, 1);
       continue;
     }
 
-    BI_sub_bb(rem, rem, subtractor);
-    BI_add_bb(res, res, multiplier);
+    BI_sub_bb(remainder, remainder, subtractor);
+    BI_add_bb(quotient, quotient, multiplier);
 
     BI_mul_bi(subtractor, subtractor, 2);
     BI_mul_bi(multiplier, multiplier, 2);
   }
 
-  res->sign = sign;
+  if (quotient->val[quotient->len - 1] == 0)
+  {
+    quotient->sign = 1;
+  }
+  else
+  {
+    quotient->sign = sign;
+  }
 
-  n->sign = nsign;
-  d->sign = dsign;  
+  BI_set_b(res, quotient);
+  BI_set_b(rem, remainder);
 
+  BI_free(quotient);
+  BI_free(remainder);
+  BI_free(denominator);
   BI_free(multiplier);
   BI_free(subtractor);
 
@@ -885,14 +905,24 @@ enum BI_comparison BI_cmp_bb(bigint* a, bigint* b)
     return BI_LESSTHAN;
   }
 
-  if (a->len > b->len)
+  if (a->sign == 1 && a->len > b->len)
   {
     return BI_GREATERTHAN;
   }
 
-  if (b->len > a->len)
+  if (b->sign == 1 && b->len > a->len)
   {
     return BI_LESSTHAN;
+  }
+
+  if (a->sign == -1 && a->len > b->len)
+  {
+    return BI_LESSTHAN;
+  }
+
+  if (b->sign == -1 && b->len > a->len)
+  {
+    return BI_GREATERTHAN;
   }
 
   for (int i = a->len-1; i >= 0; i--)
@@ -976,40 +1006,37 @@ char* BI_to_str(bigint* bi, int base)
       BI_errno = BIERR_TOOBIG;
       return NULL;
     }
-  } while (BI_cmp_bi(quo, 0) == BI_GREATERTHAN);
+  } while (BI_cmp_bi(quo, 0) != BI_EQUAL);
   BI_free(quo);
 
   bigint* num = BI_new_b(bi);
   bigint* rem = BI_new_i(0);
   bigint* den = BI_new_i(base);
 
-  // add one for NULL terminator
   len++;
 
-  // add one if signed
   if (bi->sign == -1)
-  {
     len++;
-  }
 
   char* s = calloc(1, len);
-  int i;
+  int stop = 0;
   if (bi->sign == -1)
   {
     s[0] = '-';
-    i = 1;
+    stop = 1;
   }
-  else i = 0;
 
-  for (; i < len; i++)
+  for (int i = len - 2; i >= stop; i--)
   {
     BI_div_mod_bb(num, rem, num, den);
+
     int curr;
     BI_to_int(rem, &curr);
+
     if (curr < 9)
-      s[i--] = curr + '0';
+      s[i] = curr + '0';
     else
-      s[i--] = curr + 'A';
+      s[i] = (curr - 10) + 'A';
   }
 
   BI_free(num);
@@ -1021,6 +1048,18 @@ char* BI_to_str(bigint* bi, int base)
 }
 
 
+static int __pow(int base, int exp)
+{
+  if (exp < 0)
+    return 0;
+
+  int result = 1;
+  while (exp--)
+    result *= base;
+
+  return result;
+}
+
 int BI_to_int(bigint* bi, int* i)
 {
   if (bi == NULL || i == NULL)
@@ -1029,15 +1068,18 @@ int BI_to_int(bigint* bi, int* i)
     return -1;
   }
 
-  if (BI_cmp_bi(bi, INT_MAX) == BI_GREATERTHAN)
+  if (BI_cmp_bi(bi, INT_MAX) == BI_GREATERTHAN ||
+      BI_cmp_bi(bi, INT_MIN) == BI_LESSTHAN)
   {
     BI_errno = BIERR_TOOBIG;
     return -1;
   }
 
+  *i = 0;
+
   for (int j = 0; j < bi->len; j++)
   {
-    *i += bi->val[j] * pow(256, j);
+    *i += bi->val[j] * __pow(256, j);
   }
 
   *i *= bi->sign;
@@ -1126,4 +1168,3 @@ void BI_perror(char* context)
         fprintf(stderr, "Unknown error %d\n", BI_errno);
   }
 }
-
