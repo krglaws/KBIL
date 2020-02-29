@@ -1033,7 +1033,7 @@ char* BI_to_str(bigint* bi, int base)
     int curr;
     BI_to_int(rem, &curr);
 
-    if (curr < 9)
+    if (curr < 10)
       s[i] = curr + '0';
     else
       s[i] = (curr - 10) + 'A';
