@@ -73,6 +73,7 @@ uninstall:
 .PHONY: clean
 clean:
 	@if [ -f $(KBILTARG) ]; then rm $(KBILTARG); fi;
+	@if [ -f $(KBILTESTTARG) ]; then rm $(KBILTESTTARG); fi;
 	@if [ -f $(STATICLIB) ]; then rm $(STATICLIB); fi;
 	@if [ -f $(DYNAMICLIB) ]; then rm $(DYNAMICLIB); fi;
 
