@@ -56,13 +56,6 @@ run_tests: build_tests
 	@echo "Done."
 
 
-.PHONY: install
-install: $(STATICLIB) $(DYNAMICLIB)
-	@cp $(INC)/* $(INCLOC)
-	@cp $(STATICLIB) $(LIBLOC)
-	@cp $(DYNAMICLIB) $(LIBLOC)
-
-
 .PHONY: uninstall
 uninstall:
 	@if [ -f $(INCLOC)/kbil.h ]; then rm -rf $(INCLOC)/kbil.h; fi;
@@ -85,4 +78,12 @@ all: run_tests
 	@echo "building dynamic library..."
 	$(MAKE) $(DYNAMICLIB)
 	@echo "done."
+
+
+.PHONY: install
+install: all
+	@cp $(INC)/* $(INCLOC)
+	@cp $(STATICLIB) $(LIBLOC)
+	@cp $(DYNAMICLIB) $(LIBLOC)
+	@echo "Installed successfully."
 
