@@ -79,8 +79,8 @@ bigint* BI_new_s(char* s, int base)
   int slen = strlen(s);
   for (int i = slen - 1; i >= 0; i--)
   {
-    if (s[i] < '0' && s[i] > '9' &&
-        s[i] < 'A' && s[i] > 'F')
+    if (s[i] < '0' || (s[i] > '9' &&
+        s[i] < 'A') || s[i] > 'F')
     {
       BI_errno = BIERR_BADENC;
       return NULL;
