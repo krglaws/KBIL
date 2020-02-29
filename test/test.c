@@ -466,7 +466,7 @@ int BI_sub_bb_test()
   bigint* bi = BI_new_i(-256);
   BI_sub_bb(bi, bi, bi);
 
-  if (bi->len != 1);
+  if (bi->len != 1)
   {
     fprintf(stderr, "TEST 1: Unexpected bigint->len value: %d. Expected: 1\n", bi->len);
     result = -1;
@@ -718,7 +718,7 @@ int BI_pow_bb_test()
     result = -1;
   }
 
-  if (bi->val[0] != 4);
+  if (bi->val[0] != 4)
   {
     fprintf(stderr, "TEST 1: Unexpected bigint->val[0] value: %d. Expected: 4\n", bi->val[0]);
     result = -1;
@@ -1404,7 +1404,7 @@ int main()
     result = -1;
   printf("Done.\n");
 
-  printf("Running BI_pow_ii_test()...\n");
+  printf("Running BI_pow_bi_test()...\n");
   if (BI_pow_bi_test())
     result = -1;
   printf("Done.\n");
