@@ -1,7 +1,7 @@
 
 CC := gcc
-CFLAGS := -fPIC -Iinclude -std=c99 -lm
-DEBFLAGS := -Iinclude -std=c99 -lm -g
+CFLAGS := -fPIC -Iinclude -std=c99
+DEBFLAGS := -Iinclude -std=c99 -g
 
 SRC := ./src
 INC := ./include
@@ -45,12 +45,12 @@ build_tests: $(KBILTESTTARG)
 
 
 .PHONY: run_tests
-run_tests: buid_tests
+run_tests: build_tests
 	@echo "Running tests..."
 	@echo "======================"
 	@echo "----------------------"
 	@./bin/kbiltests.out
-	@if [ $? != 0 ]; then; echo "Tests failed."; else echo "All tests passed."; fi;
+	@if [ $? = 0 ]; then echo "Tests failed."; else echo "All tests passed."; fi;
 	@echo "----------------------"
 	@echo "======================"
 	@echo "Done."
@@ -78,7 +78,7 @@ clean:
 
 
 .PHONY: all 
-all: 
+all: run_tests 
 	@echo "building static library..."
 	$(MAKE) $(STATICLIB)
 	@echo "done."
