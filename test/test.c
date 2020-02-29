@@ -1265,6 +1265,7 @@ int BI_to_str_test()
     result = -1;
   }
   free(s);
+  BI_free(bi);
 
   return result;
 }
@@ -1301,6 +1302,7 @@ int BI_to_int_test()
     fprintf(stderr, "TEST 3: Unexpected int value: %d. Expected -1\n", i);
     result = -1;
   }
+  BI_free(bi);
 
   return result;
 }
