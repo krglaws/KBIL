@@ -90,7 +90,7 @@ int BI_new_s_test()
   {
     fprintf(stderr, "TEST 1: Unexpected value at bigint->val[0]: %d. Expected: 1\n", bi->val[2]);
     result = -1;
-}
+  }
   BI_free(bi);
 
   /* TEST 2 */
@@ -115,6 +115,29 @@ int BI_new_s_test()
     result = -1;
   }
   BI_free(bi);
+
+  return result;
+}
+
+int BI_rand_test()
+{
+  int result = 0;
+
+  /* TEST 1 */
+  bigint* b = BI_rand(9);
+
+  if (b->len != 2)
+  {
+    fprintf(stderr, "TEST 1: Unexpected bigint->len value: %d. Expected: 2\n", b->len);
+    result = -1;
+  }
+
+  if (b->val[1] != 1)
+  {
+    fprintf(stderr, "TEST 1: Unexpected bigint->val[1] value: %d. Expected: 1\n", b->val[1]);
+    result = -1;
+  }
+  BI_free(b);
 
   return result;
 }
@@ -176,30 +199,6 @@ int BI_set_b_test()
     result = -1;
   }
   BI_free(a);
-  BI_free(b);
-
-  return result;
-}
-
-int BI_rand_test()
-{
-  int result = 0;
-
-  /* TEST 1 */
-  bigint* b = BI_new_i(0);
-  BI_rand(b, 9);
-
-  if (b->len != 2)
-  {
-    fprintf(stderr, "TEST 1: Unexpected bigint->len value: %d. Expected: 2\n", b->len);
-    result = -1;
-  }
-
-  if (b->val[1] != 1)
-  {
-    fprintf(stderr, "TEST 1: Unexpected bigint->val[1] value: %d. Expected: 1\n", b->val[1]);
-    result = -1;
-  }
   BI_free(b);
 
   return result;
