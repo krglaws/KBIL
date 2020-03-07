@@ -444,6 +444,7 @@ bigint* BI_sub_bb(bigint* res, bigint* a, bigint* b)
     return NULL;
   }
 
+  // if 'a' is the same reference as 'b', make a copy of 'b'
   if (a == b)
   {
     b = BI_new_b(a);
@@ -453,6 +454,7 @@ bigint* BI_sub_bb(bigint* res, bigint* a, bigint* b)
     return status;
   }
 
+  // subtraction is just addition with b's sign flipped
   int bsign = b->sign;
   b->sign *= -1;
   bigint* status = BI_add_bb(res, a, b);
@@ -512,23 +514,30 @@ bigint* BI_mul_bb(bigint* res, bigint* a, bigint* b)
     return NULL;
   }
 
+  // Calculate result sign
   int sign = a->sign * b->sign;
 
+  // Save b sign and set to positive
   int bsign = b->sign;
   b->sign = 1;
 
+  /* Allocate bigints to store product and
+     temp multiplication result */
   bigint* product = BI_new_i(0);
   bigint* temp = BI_new_i(0);
 
+  // Loop over each digit in 'a'
   for (int i = 0; i < a->len; i++)
   {
     BI_set_i(temp, 0);
 
+    // Loop over digit and add 'b' to temp each time
     for (int j = 0; j < a->val[i]; j++)
     {
       BI_add_bb(temp, temp, b);
     }
 
+    // Shift temp 'i' digits up in value and add to product
     unsigned char* fullval = calloc(1, temp->len + i);
     memcpy(fullval + i, temp->val, temp->len);
     free(temp->val);
@@ -538,6 +547,7 @@ bigint* BI_mul_bb(bigint* res, bigint* a, bigint* b)
     BI_add_bb(product, product, temp);
   }
 
+  // Restore b's sign, store product into 'res', free up bigints
   BI_free(temp);
   b->sign = bsign;
   BI_set_b(res, product);
@@ -613,6 +623,7 @@ bigint* BI_pow_bb(bigint* res, bigint* b, bigint* e)
     return NULL;
   }
 
+  // If exponent is negative, return zero
   if (e->sign == -1)
   {
     BI_set_i(res, 0);
@@ -620,25 +631,37 @@ bigint* BI_pow_bb(bigint* res, bigint* b, bigint* e)
     return 0;
   }
 
+  // Bigint to store product
   bigint* prod = BI_new_i(1);
+
+  // Temporary bigint that holds b^currpow
   bigint* temp = BI_new_b(b);
+
+  // Copy 'e' to gradually count its value down to zero
   bigint* powcount = BI_new_b(e);
+
+  // Current power of temp
   bigint* currpow = BI_new_i(1);
 
+  // While powcount > 0
   while (BI_cmp_bi(powcount, 0) != BI_EQUAL)
   {
+    // If currpow > powcount, reset currpow to 1 and temp to b
     if (BI_cmp_bb(currpow, powcount) == BI_GREATERTHAN)
     {
       BI_set_i(currpow, 1);
       BI_set_b(temp, b);
     }
 
+    /* Multiply product * temp, subtract current power from powcount,
+       double currpow, and square temp */
     BI_mul_bb(prod, prod, temp);
     BI_sub_bb(powcount, powcount, currpow);
     BI_mul_bi(currpow, currpow, 2);
     BI_mul_bb(temp, temp, temp);
   }
 
+  // Store product into result, free up bigints
   BI_set_b(res, prod);
   BI_free(prod);
   BI_free(temp);
@@ -714,19 +737,24 @@ bigint* BI_div_mod_bb(bigint* res, bigint* rem, bigint* n, bigint* d)
     return NULL;
   }
 
+  // Check for divide by zero
   if (BI_cmp_bi(d, 0) == BI_EQUAL)
   {
     SET_ERR(BI_EDIVZERO);
     return NULL;
   }
 
+  // Calculate result sign
   int sign = n->sign * d->sign;
 
+  // Bigint to store quotient
   bigint* quotient = BI_new_i(0);
 
+  // Bigint to store remainder
   bigint* remainder = BI_new_b(n);
   remainder->sign = 1;
 
+  // Copy d into denominator and make positive
   bigint* denominator = BI_new_b(d);
   denominator->sign = 1;
 
@@ -1110,6 +1138,7 @@ static int __pow(int base, int exp)
 
   return result;
 }
+
 
 int BI_to_int(bigint* bi, int* i)
 {
