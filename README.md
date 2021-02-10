@@ -1,7 +1,7 @@
 # KBIL
 ### "Kyle's Big Integer Library"
 
-I wrote this after I learned a little about RSA encryption. For some reason I really wanted to write my own library to handle big integers instead of using GNU MP or any other library. I did not work too hard to make it run as fast as possible, as I really just wanted it to work. And I think it does! But it is quite slow at the moment, so maybe some day I will try to make it more optimized.
+I wrote this after I learned a little about RSA encryption. I really wanted to write my own library to handle the big integers that are required for encryption instead of using GNU MP or some other library. The main goal was to just get everything working. Unfortunately the code is painfully slow, so this is more of a toy/experiment than something that is actually useful.
 
 ## Demo
 Here is an example of how to use KBIL:
